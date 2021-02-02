@@ -18,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.autograd import Variable
 from datetime import datetime
 from utils import mkdir
-
+from framestack import FrameStack
 
 now = datetime.now()
 dt_string = now.strftime("%d_%m_%Y_%H:%M:%S")
@@ -32,7 +32,8 @@ class Agent():
         torch.manual_seed(self.seed)
         np.random.seed(seed=self.seed)
         random.seed(self.seed)
-        self.env = gym.make(config["env_name"])
+        env = gym.make(config["env_name"])
+        self.env = FrameStack(env, config)
         self.env.seed(self.seed)
         self.state_size = state_size
         self.action_size = action_size
@@ -61,6 +62,8 @@ class Agent():
         self.steps = 0
         self.predicter = QNetwork(state_size, action_size, self.fc1, self.fc2, self.seed).to(self.device)
         self.optimizer_pre = optim.Adam(self.predicter.parameters(), lr=self.lr_pre)
+        #self.encoder_freq = Encoder(config).to(self.device)
+        #self.encoder_optimizer_frq = torch.optim.Adam(self.encoder_freq.parameters(), self.lr)
         self.encoder = Encoder(config).to(self.device)
         self.encoder_optimizer = torch.optim.Adam(self.encoder.parameters(), self.lr)
         pathname = "lr_{}_batch_size_{}_fc1_{}_fc2_{}_seed_{}".format(self.lr, self.batch_size, self.fc1, self.fc2, self.seed)
@@ -85,11 +88,13 @@ class Agent():
         states, next_states, actions, dones = memory_ex.expert_policy(self.batch_size)
         states = states.type(torch.float32).div_(255)
         states = self.encoder.create_vector(states) 
+        next_states = next_states.type(torch.float32).div_(255)
+        next_states = self.encoder.create_vector(next_states) 
         self.state_action_frq(states, actions)
-        actions = torch.randint(0, 4, (self.batch_size, 1), dtype=torch.int64, device=self.device)
-        self.compute_shift_function(states, next_states, actions, dones)
-        self.compute_r_function(states, actions)
-        self.compute_q_function(states, next_states, actions, dones)
+        actions = torch.randint(0, 3, (self.batch_size, 1), dtype=torch.int64, device=self.device)
+        self.compute_shift_function(states.detach(), next_states, actions, dones)
+        self.compute_r_function(states.detach(), actions)
+        self.compute_q_function(states.detach(), next_states, actions, dones)
         self.soft_update(self.R_local, self.R_target, self.tau)
         self.soft_update(self.q_shift_local, self.q_shift_target, self.tau)
         self.soft_update(self.qnetwork_local, self.qnetwork_target, self.tau)
@@ -119,6 +124,7 @@ class Agent():
         # Minimize the loss
         self.optimizer.zero_grad()
         loss.backward()
+        self.encoder_optimizer.step()
         # torch.nn.utils.clip_grad_norm_(self.qnetwork_local.parameters(), 1)
         self.optimizer.step()
 
@@ -225,7 +231,6 @@ class Agent():
         self.optimizer_pre.zero_grad()
         self.encoder_optimizer.zero_grad()
         loss.backward()
-        self.encoder_optimizer.step()
         # torch.nn.utils.clip_grad_norm_(self.predicter.parameters(), 1)
         self.optimizer_pre.step()
         self.writer.add_scalar('Predict_loss', loss, self.steps)
@@ -339,7 +344,7 @@ class Agent():
         action = torch.argmax(q_values).item()
         return action
 
-    def eval_policy(self, record=False, eval_episodes=4):
+    def eval_policy(self, record=False, eval_episodes=2):
         if record:
             env = wrappers.Monitor(self.env, str(self.vid_path) + "/{}".format(self.steps), video_callable=lambda episode_id: True, force=True)
         else:

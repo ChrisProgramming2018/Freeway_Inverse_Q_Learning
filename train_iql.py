@@ -11,9 +11,9 @@ def train(env, config):
     """
     t0 = time.time()
     save_models_path =  str(config["locexp"])
-    memory = ReplayBuffer((8,), (1,), config["buffer_size"], config["seed"], config["device"])
+    memory = ReplayBuffer((3, config["size"], config["size"]), (1,), config["buffer_size"], config["seed"], config["device"]) 
     memory.load_memory(config["buffer_path"])
-    agent = Agent(state_size=8, action_size=4,  config=config) 
+    agent = Agent(state_size=200, action_size=3,  config=config) 
     if config["idx"] < memory.idx:
         memory.idx = config["idx"] 
     print("memory idx ",memory.idx)  

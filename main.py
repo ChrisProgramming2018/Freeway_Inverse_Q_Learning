@@ -15,14 +15,15 @@ def main(args):
     print("use the env {} ".format(param["env_name"]))
     print(param)
     print("Start Programm in {}  mode".format(args.mode))
-    env = gym.make(param["env_name"])
+    env = gym.make(param["env_name"]) 
+    print(env.action_space.n)
     if args.mode == "search":
         param["lr_pre"] = args.lr_pre
         param["lr"] = args.lr
         param["fc1_units"] = args.fc1_units
         param["fc2_units"] = args.fc2_units
         param["clip"] = args.clip
-    param["buffer_path"] = args.buffer_path
+        param["buffer_path"] = args.buffer_path
     param["locexp"] = args.locexp
     text = str(param)
     write_into_file(str(param["locexp"]) + "/hyperparameters", text)

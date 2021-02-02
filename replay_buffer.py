@@ -45,7 +45,7 @@ class ReplayBuffer(object):
         obses = torch.as_tensor(obses, device=self.device)
         next_obses = torch.as_tensor(next_obses, device=self.device)
         actions = torch.as_tensor(self.actions[idxs], device=self.device)
-        not_dones_no_max = torch.as_tensor(self.not_dones_no_max[idxs], device=self.device)
+        not_dones_no_max = torch.as_tensor(self.not_dones[idxs], device=self.device)
         return obses, actions, next_obses, not_dones_no_max
 
     def expert_policy(self, batch_size):
@@ -57,17 +57,7 @@ class ReplayBuffer(object):
         actions = torch.as_tensor(self.actions[idxs], device=self.device)
         dones = torch.as_tensor(self.not_dones_no_max[idxs], device=self.device)
         return obses, next_obses, actions, dones
-
-    def add_expert(self, obs, action, reward, next_obs, done, done_no_max):
-        for a in range(4):
-            self.k += 1
-            np.copyto(self.obses[self.idx], obs)
-            np.copyto(self.actions[self.idx], a)
-            np.copyto(self.next_obses[self.idx], next_obs)
-            np.copyto(self.not_dones[self.idx], not done)
-            self.idx = (self.idx + 1) % self.capacity
-            self.full = self.full or self.idx == 0
-
+    
     def save_memory(self, filename):
         """
         Use numpy save function to store the data in a given file
@@ -81,9 +71,6 @@ class ReplayBuffer(object):
 
         with open(filename + '/next_obses.npy', 'wb') as f:
             np.save(f, self.next_obses)
-
-        with open(filename + '/rewards.npy', 'wb') as f:
-            np.save(f, self.rewards)
 
         with open(filename + '/not_dones.npy', 'wb') as f:
             np.save(f, self.not_dones)
@@ -111,9 +98,6 @@ class ReplayBuffer(object):
 
         with open(filename + '/not_dones.npy', 'rb') as f:
             self.not_dones = np.load(f)
-
-        with open(filename + '/not_dones_no_max.npy', 'rb') as f:
-            self.not_dones_no_max = np.load(f)
 
         with open(filename + '/index.txt', 'r') as f:
             self.idx = int(f.read())
